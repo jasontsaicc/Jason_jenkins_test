@@ -79,6 +79,13 @@ resource "aws_instance" "jenkins_ec2" {
               sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
               sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
               sudo dnf install jenkins -y
+                            # 建立新的 tmp 目錄
+              sudo mkdir -p /var/jenkins_home/tmp
+              sudo chown -R jenkins:jenkins /var/jenkins_home/tmp
+
+              # 修改 Jenkins 啟動參數，指定新的 tmp 目錄
+              echo 'JENKINS_JAVA_OPTIONS="-Djava.io.tmpdir=/var/jenkins_home/tmp"' | sudo tee -a /etc/sysconfig/jenkins
+
               sudo systemctl enable jenkins
               sudo systemctl start jenkins
               EOF
