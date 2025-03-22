@@ -137,3 +137,26 @@ resource "aws_iam_role_policy_attachment" "jenkins_ecs_access" {
   role       = aws_iam_role.jenkins_ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
 }
+
+resource "aws_ecr_repository" "app_repo" {
+  name                 = "jenkins-test-app"
+  image_tag_mutability = "MUTABLE"
+
+  lifecycle_policy {
+    policy = jsonencode({
+      rules = [{
+        rulePriority = 1,
+        description  = "Expire untagged images after 7 days",
+        selection    = {
+          tagStatus     = "untagged",
+          countType     = "sinceImagePushed",
+          countUnit     = "days",
+          countNumber   = 7
+        },
+        action = {
+          type = "expire"
+        }
+      }]
+    })
+  }
+}
