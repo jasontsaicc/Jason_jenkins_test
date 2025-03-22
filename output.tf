@@ -21,3 +21,7 @@ output "jenkins_ec2_public_ip" {
 output "jenkins_eip" {
   value = aws_eip.jenkins_eip.public_ip
 }
+
+output "jenkins_sg_ingress" {
+  value = aws_security_group.jenkins_sg.ingress
+}
