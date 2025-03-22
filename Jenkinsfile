@@ -1,9 +1,20 @@
 pipeline {
     agent any
+
     stages {
+        stage('Build') {
+            steps {
+                echo '🔧 Building project...'
+            }
+        }
         stage('Test') {
             steps {
-                echo "Hello from GitHub!"
+                echo '✅ Running tests...'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                echo '🚀 Deploying...'
             }
         }
     }
