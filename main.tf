@@ -80,6 +80,7 @@ resource "aws_instance" "jenkins_ec2" {
     subnet_id = aws_subnet.public.id
     vpc_security_group_ids = [aws_security_group.jenkins_sg.id]
     associate_public_ip_address = true
+    iam_instance_profile   = aws_iam_instance_profile.jenkins_profile.name
     key_name = "jenkins_test"
      user_data = <<-EOF
               #!/bin/bash
@@ -101,5 +102,38 @@ resource "aws_instance" "jenkins_ec2" {
     tags = {
         Name = "jenkins_ec2"
     }
- 
+}
+
+# IAM Role：允許 EC2 擁有此角色
+resource "aws_iam_role" "jenkins_ec2_role" {
+  name = "jenkins_ec2_role"
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect = "Allow",
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        },
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+# IAM Instance Profile：綁定 IAM Role 給 EC2 使用
+resource "aws_iam_instance_profile" "jenkins_profile" {
+  name = "jenkins_instance_profile"
+  role = aws_iam_role.jenkins_ec2_role.name
+}
+
+# IAM Policy Attachments：給予 ECS / ECR 權限
+resource "aws_iam_role_policy_attachment" "jenkins_ecr_access" {
+  role       = aws_iam_role.jenkins_ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
+}
+
+resource "aws_iam_role_policy_attachment" "jenkins_ecs_access" {
+  role       = aws_iam_role.jenkins_ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
 }
