@@ -63,6 +63,16 @@ resource "aws_security_group" "jenkins_sg" {
   }
 }
 
+resource "aws_eip" "jenkins_eip" {
+  domain = "vpc"
+  depends_on = [aws_internet_gateway.igw]
+}
+
+resource "aws_eip_association" "jenkins_eip_assoc" {
+  instance_id   = aws_instance.jenkins_ec2.id
+  allocation_id = aws_eip.jenkins_eip.id
+}
+
 # Create an EC2 instance
 resource "aws_instance" "jenkins_ec2" {
     ami = "ami-0599b6e53ca798bb2"
@@ -73,13 +83,12 @@ resource "aws_instance" "jenkins_ec2" {
     key_name = "jenkins_test"
      user_data = <<-EOF
               #!/bin/bash
-              sudo yum update -y
-              sudo yum install git -y
-              sudo dnf install java-17-amazon-corretto -y
+              sudo dnf update -y
+              sudo dnf install git java-17-amazon-corretto -y
               sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
               sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
               sudo dnf install jenkins -y
-                            # 建立新的 tmp 目錄
+              # 建立新的 tmp 目錄
               sudo mkdir -p /var/jenkins_home/tmp
               sudo chown -R jenkins:jenkins /var/jenkins_home/tmp
 
