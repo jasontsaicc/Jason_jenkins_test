@@ -2,21 +2,24 @@ provider "aws" {
   region = "ap-northeast-1"
 }
 
-# Create a VPC
-resource "aws_vpc" "main" {
-    cidr_block = "10.0.0.0/16"
-    enable_dns_support = true
-}
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "5.1.1"
 
-# Create a public subnet
-resource "aws_subnet" "public" {
-    vpc_id = aws_vpc.main.id
-    cidr_block = "10.0.1.0/24"
-    map_public_ip_on_launch = true
-}
-# Create an internet gateway
-resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.main.id
+  name = "jenkins-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["ap-northeast-1a", "ap-northeast-1b"]
+  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+  enable_nat_gateway   = false
+
+  tags = {
+    Project = "jenkins"
+    Environment = "dev"
+  }
 }
 
 # Create a route table
