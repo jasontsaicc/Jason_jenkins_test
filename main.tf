@@ -87,6 +87,11 @@ resource "aws_instance" "jenkins_ec2" {
 
   user_data = <<-EOF
               #!/bin/bash
+              sudo fallocate -l 2G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+              sudo bash -c 'echo "/swapfile swap swap defaults 0 0" >> /etc/fstab'
               sudo dnf update -y
               sudo dnf install git java-17-amazon-corretto -y
               sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
