@@ -84,6 +84,11 @@ resource "aws_instance" "jenkins_ec2" {
   associate_public_ip_address = true
   iam_instance_profile        = aws_iam_instance_profile.jenkins_profile.name
   key_name                    = "jenkins_test"
+  root_block_device {
+    volume_size = 20           
+    volume_type = "gp3"        
+    delete_on_termination = true
+  }
 
   user_data = <<-EOF
               #!/bin/bash
