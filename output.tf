@@ -1,9 +1,9 @@
 output "vpc_id" {
-  value = aws_vpc.main.cidr_block
+  value = module.vpc.vpc_id
 }
 
-output "subnet_id_public_cidr_block" {
-  value = aws_subnet.public.cidr_block
+output "public_subnet_cidrs" {
+  value = module.vpc.public_subnets_cidr_blocks
 }
 
 output "jenkins_ec2_availability_zone" {
@@ -24,4 +24,16 @@ output "jenkins_eip" {
 
 output "ecr_repo_url" {
   value = aws_ecr_repository.app_repo.repository_url
+}
+
+output "alb_dns_name" {
+  value = aws_lb.app_alb.dns_name
+}
+
+output "ecs_cluster_name" {
+  value = aws_ecs_cluster.app_cluster.name
+}
+
+output "ecs_service_name" {
+  value = aws_ecs_service.app_service.name
 }
