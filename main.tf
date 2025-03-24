@@ -79,7 +79,7 @@ resource "aws_eip" "jenkins_eip" {
 
 # Jenkins EC2 Instance
 resource "aws_instance" "jenkins_ec2" {
-  ami                         = "ami-0599b6e53ca798bb2"
+  ami                         = "ami-026c39f4021df9abe" # ubuntu 22.04
   instance_type               = "t3.small"
   subnet_id                   = module.vpc.public_subnets[0]
   vpc_security_group_ids      = [aws_security_group.jenkins_sg.id]
@@ -94,23 +94,43 @@ resource "aws_instance" "jenkins_ec2" {
 
   user_data = <<-EOF
               #!/bin/bash
+              set -e  # 有錯就停下來
+
+              # 建立 swap，避免小型 EC2 記憶體不足
               sudo fallocate -l 2G /swapfile
               sudo chmod 600 /swapfile
               sudo mkswap /swapfile
               sudo swapon /swapfile
-              sudo bash -c 'echo "/swapfile swap swap defaults 0 0" >> /etc/fstab'
-              sudo dnf update -y
-              sudo dnf install git java-17-amazon-corretto -y
-              sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
-              sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io-2023.key
-              sudo dnf install jenkins -y
+              echo "/swapfile swap swap defaults 0 0" | sudo tee -a /etc/fstab
+
+              # 更新套件清單與安裝必要套件
+              sudo apt-get update -y
+              sudo apt-get install -y git openjdk-17-jdk curl gnupg
+
+              # 匯入 Jenkins key 並加入套件來源
+              curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
+                /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+
+              echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+                https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+                /etc/apt/sources.list.d/jenkins.list > /dev/null
+
+              # 安裝 Jenkins
+              sudo apt-get update -y
+              sudo apt-get install -y jenkins
+
+              # 設定 tmp 資料夾避免 Jenkins 預設 tmp 空間不足
               sudo mkdir -p /var/jenkins_home/tmp
               sudo chown -R jenkins:jenkins /var/jenkins_home/tmp
-              echo 'JENKINS_JAVA_OPTIONS="-Djava.io.tmpdir=/var/jenkins_home/tmp"' | sudo tee -a /etc/sysconfig/jenkins
+              echo 'JAVA_ARGS="-Djava.io.tmpdir=/var/jenkins_home/tmp"' | sudo tee -a /etc/default/jenkins
+
+              # 啟動 Jenkins
               sudo systemctl enable jenkins
               sudo systemctl start jenkins
-              EOF
 
+              # 匯出初始密碼到 log，方便 EC2 Console 檢查
+              sudo cat /var/lib/jenkins/secrets/initialAdminPassword > /var/log/jenkins-init.log
+              EOF
   tags = {
     Name = "jenkins_ec2"
   }
