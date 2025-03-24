@@ -1,6 +1,13 @@
 pipeline {
     agent any
 
+    environment {
+        AWS_REGION = 'ap-northeast-1'
+        ECR_REPO =  'jenkins-test-app'
+        IMAGE_TAG = 'latest'
+        REPO_URI = "096011725235.dkr.ecr.ap-northeast-1.amazonaws.com/jenkins-test-app
+        }
+
     stages {
         stage('Checkout') {
             steps {
@@ -8,22 +15,27 @@ pipeline {
                 checkout scm
             }
         }
-        stage('Build') {
-            steps {
-                echo 'Building project..'
+        stage('Build Docker Image'){
+            steps{
+                sh 'docker build -t ${ECR_REPO}:${IMAGE_TAG} .'
             }
         }
-
-        stage('Test') {
+        stage('Login to ECR') {
             steps {
-                echo 'Running tests...'
+                sh '''
+                    aws ecr get-login-password --region $AWS_REGION | \
+                    docker login --username AWS --password-stdin $REPO_URI
+                '''
             }
         }
-
-        stage('Deploy') {
+        stage('Push Docker Image') {
             steps {
-                echo 'Deploying...'
+                sh '''
+                    docker tag ${ECR_REPO}:${IMAGE_TAG} $REPO_URI:$IMAGE_TAG
+                    docker push $REPO_URI::$IMAGE_TAG
+                '''
             }
         }
     }
+
 }
