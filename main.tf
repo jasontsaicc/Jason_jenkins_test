@@ -1,4 +1,4 @@
-# 使用 AWS 官方 VPC Module 建立多 AZ 公網 VPC 架構
+# AWS VPC Module
 provider "aws" {
   region = "ap-northeast-1"
 }
@@ -10,8 +10,8 @@ module "vpc" {
   name = "jenkins-vpc"
   cidr = "10.0.0.0/16"
 
-  azs             = ["ap-northeast-1a", "ap-northeast-1c"]
-  public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+  azs            = ["ap-northeast-1a", "ap-northeast-1c"]
+  public_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
 
   enable_dns_support   = true
   enable_dns_hostnames = true
@@ -72,10 +72,12 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
+# Jenkins EIP
 resource "aws_eip" "jenkins_eip" {
   domain = "vpc"
 }
 
+# Jenkins EC2 Instance
 resource "aws_instance" "jenkins_ec2" {
   ami                         = "ami-0599b6e53ca798bb2"
   instance_type               = "t3.small"
@@ -85,8 +87,8 @@ resource "aws_instance" "jenkins_ec2" {
   iam_instance_profile        = aws_iam_instance_profile.jenkins_profile.name
   key_name                    = "jenkins_test"
   root_block_device {
-    volume_size = 20           
-    volume_type = "gp3"        
+    volume_size           = 20
+    volume_type           = "gp3"
     delete_on_termination = true
   }
 
@@ -114,43 +116,50 @@ resource "aws_instance" "jenkins_ec2" {
   }
 }
 
+# Associate EIP with Jenkins EC2 Instance
 resource "aws_eip_association" "jenkins_eip_assoc" {
   instance_id   = aws_instance.jenkins_ec2.id
   allocation_id = aws_eip.jenkins_eip.id
 }
 
+# IAM Role for Jenkins EC2 Instance
 resource "aws_iam_role" "jenkins_ec2_role" {
   name = "jenkins_ec2_role"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Effect = "Allow",
+      Effect    = "Allow",
       Principal = { Service = "ec2.amazonaws.com" },
       Action    = "sts:AssumeRole"
     }]
   })
 }
 
+# IAM Instance Profile for Jenkins EC2 Instance
 resource "aws_iam_instance_profile" "jenkins_profile" {
   name = "jenkins_instance_profile"
   role = aws_iam_role.jenkins_ec2_role.name
 }
 
+# Attach policies to the Jenkins EC2 Role
 resource "aws_iam_role_policy_attachment" "jenkins_ecr_access" {
   role       = aws_iam_role.jenkins_ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryFullAccess"
 }
 
+# Attach ECS  Access policy to the Jenkins EC2 Role
 resource "aws_iam_role_policy_attachment" "jenkins_ecs_access" {
   role       = aws_iam_role.jenkins_ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonECS_FullAccess"
 }
 
+# ecr repository
 resource "aws_ecr_repository" "app_repo" {
   name                 = "jenkins-test-app"
   image_tag_mutability = "MUTABLE"
 }
 
+# ecr repository policy
 resource "aws_ecr_lifecycle_policy" "app_repo_policy" {
   repository = aws_ecr_repository.app_repo.name
   policy = jsonencode({
@@ -170,27 +179,31 @@ resource "aws_ecr_lifecycle_policy" "app_repo_policy" {
   })
 }
 
+#ecs cluster
 resource "aws_ecs_cluster" "app_cluster" {
   name = "jenkins-app-cluster"
 }
 
+#ecs task execution role
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [{
-      Effect = "Allow",
+      Effect    = "Allow",
       Principal = { Service = "ecs-tasks.amazonaws.com" },
       Action    = "sts:AssumeRole"
     }]
   })
 }
 
+# 
 resource "aws_iam_role_policy_attachment" "ecs_execution_role_attach" {
   role       = aws_iam_role.ecs_task_execution_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+# aws_lb app_alb
 resource "aws_lb" "app_alb" {
   name               = "app-alb"
   internal           = false
@@ -199,12 +212,13 @@ resource "aws_lb" "app_alb" {
   security_groups    = [aws_security_group.alb_sg.id]
 }
 
+# alb target group
 resource "aws_lb_target_group" "app_tg" {
-  name     = "app-tg"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = module.vpc.vpc_id
-  target_type  = "ip"
+  name        = "app-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = module.vpc.vpc_id
+  target_type = "ip"
 
   health_check {
     path                = "/"
@@ -216,6 +230,7 @@ resource "aws_lb_target_group" "app_tg" {
   }
 }
 
+# alb listener
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.app_alb.arn
   port              = 80
@@ -227,6 +242,7 @@ resource "aws_lb_listener" "http_listener" {
   }
 }
 
+# ECS Task Definition
 resource "aws_ecs_task_definition" "app_task" {
   family                   = "jenkins-task"
   requires_compatibilities = ["FARGATE"]
@@ -246,6 +262,7 @@ resource "aws_ecs_task_definition" "app_task" {
   }])
 }
 
+
 resource "aws_ecs_service" "app_service" {
   name            = "jenkins-app-service"
   cluster         = aws_ecs_cluster.app_cluster.id
@@ -254,8 +271,8 @@ resource "aws_ecs_service" "app_service" {
   desired_count   = 1
 
   network_configuration {
-    subnets         = module.vpc.public_subnets
-    security_groups = [aws_security_group.jenkins_sg.id]
+    subnets          = module.vpc.public_subnets
+    security_groups  = [aws_security_group.jenkins_sg.id]
     assign_public_ip = true
   }
 
