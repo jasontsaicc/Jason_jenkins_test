@@ -5,8 +5,7 @@ pipeline {
         AWS_REGION = 'ap-northeast-1'
         ECR_REPO = 'jenkins-test-app'
         IMAGE_TAG = 'latest'
-        REPO_URI = "096011725235.dkr.ecr.ap-northeast-1.amazonaws.com/jenkins-test-app"
-    }
+        REPO_URI = "096011725235.dkr.ecr.ap-northeast-1.amazonaws.com/jenkins-test-app"    }
 
     stages {
         stage('Checkout') {
