@@ -5,7 +5,7 @@ pipeline {
         AWS_REGION = 'ap-northeast-1'
         ECR_REPO =  'jenkins-test-app'
         IMAGE_TAG = 'latest'
-        REPO_URI = "096011725235.dkr.ecr.ap-northeast-1.amazonaws.com/jenkins-test-app
+        REPO_URI = "096011725235.dkr.ecr.ap-northeast-1.amazonaws.com/jenkins-test-app"
         }
 
     stages {
@@ -17,7 +17,7 @@ pipeline {
         }
         stage('Build Docker Image'){
             steps{
-                sh 'docker build -t ${ECR_REPO}:${IMAGE_TAG} .'
+                sh "docker build -t $ECR_REPO:$IMAGE_TAG ."
             }
         }
         stage('Login to ECR') {
@@ -32,7 +32,7 @@ pipeline {
             steps {
                 sh '''
                     docker tag ${ECR_REPO}:${IMAGE_TAG} $REPO_URI:$IMAGE_TAG
-                    docker push $REPO_URI::$IMAGE_TAG
+                    docker push $REPO_URI:$IMAGE_TAG
                 '''
             }
         }
