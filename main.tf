@@ -93,44 +93,59 @@ resource "aws_instance" "jenkins_ec2" {
   }
 
   user_data = <<-EOF
-              #!/bin/bash
-              set -e  # 有錯就停下來
+                #!/bin/bash -xe
 
-              # 建立 swap，避免小型 EC2 記憶體不足
-              sudo fallocate -l 2G /swapfile
-              sudo chmod 600 /swapfile
-              sudo mkswap /swapfile
-              sudo swapon /swapfile
-              echo "/swapfile swap swap defaults 0 0" | sudo tee -a /etc/fstab
+                #### 建立 2GB swap（如果還沒建立）
+                if [ ! -f /swapfile ]; then
+                  sudo fallocate -l 2G /swapfile
+                  sudo chmod 600 /swapfile
+                  sudo mkswap /swapfile
+                  sudo swapon /swapfile
+                  echo '/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
+                fi
 
-              # 更新套件清單與安裝必要套件
-              sudo apt-get update -y
-              sudo apt-get install -y git openjdk-17-jdk curl gnupg
+                #### 更新套件清單與安裝必要工具
+                sudo apt-get update -y
+                sudo apt-get install -y git openjdk-17-jdk curl gnupg unzip wget
 
-              # 匯入 Jenkins key 並加入套件來源
-              curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
-                /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+                #### 安裝 AWS CLI v2（僅在未安裝時）
+                if ! command -v aws &> /dev/null; then
+                  cd /tmp
+                  curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                  unzip awscliv2.zip
+                  sudo ./aws/install
+                  rm -rf awscliv2.zip aws
+                fi
 
-              echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
-                https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
-                /etc/apt/sources.list.d/jenkins.list > /dev/null
+                #### 匯入 Jenkins GPG Key 與套件來源
+                curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
+                  /usr/share/keyrings/jenkins-keyring.asc > /dev/null
 
-              # 安裝 Jenkins
-              sudo apt-get update -y
-              sudo apt-get install -y jenkins
+                echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+                  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+                  /etc/apt/sources.list.d/jenkins.list > /dev/null
 
-              # 設定 tmp 資料夾避免 Jenkins 預設 tmp 空間不足
-              sudo mkdir -p /var/jenkins_home/tmp
-              sudo chown -R jenkins:jenkins /var/jenkins_home/tmp
-              echo 'JAVA_ARGS="-Djava.io.tmpdir=/var/jenkins_home/tmp"' | sudo tee -a /etc/default/jenkins
+                #### 安裝 Jenkins
+                sudo apt-get update -y
+                sudo apt-get install -y jenkins
 
-              # 啟動 Jenkins
-              sudo systemctl enable jenkins
-              sudo systemctl start jenkins
+                #### 增加 Jenkins 使用的 tmp 空間
+                sudo mkdir -p /var/jenkins_home/tmp
+                sudo chown -R jenkins:jenkins /var/jenkins_home/tmp
+                echo 'JAVA_ARGS="-Djava.io.tmpdir=/var/jenkins_home/tmp"' | sudo tee -a /etc/default/jenkins
 
-              # 匯出初始密碼到 log，方便 EC2 Console 檢查
-              sudo cat /var/lib/jenkins/secrets/initialAdminPassword > /var/log/jenkins-init.log
-              EOF
+                #### 啟動 Jenkins 並等待初始密碼產生
+                sudo systemctl enable jenkins
+                sudo systemctl start jenkins
+
+                echo "等待 Jenkins 初始密碼產生中..."
+                until [ -f /var/lib/jenkins/secrets/initialAdminPassword ]; do
+                  sleep 2
+                done
+
+                #### 將初始密碼寫入 log，方便從 EC2 console 讀取
+                sudo cat /var/lib/jenkins/secrets/initialAdminPassword > /var/log/jenkins-init.log
+  EOF
   tags = {
     Name = "jenkins_ec2"
   }
